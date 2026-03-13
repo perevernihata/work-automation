@@ -1,6 +1,8 @@
 export interface RepoConfig {
   owner: string;
   repo: string;
+  /** Local path to the repo checkout, so Claude can browse the codebase */
+  localPath?: string;
 }
 
 export interface AppConfig {

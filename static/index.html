@@ -260,12 +260,18 @@
     }
 
     .concern {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .concern-row {
       display: flex;
       align-items: flex-start;
       gap: 12px;
       padding: 14px 24px;
-      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
     }
+    .concern-row:hover { background: rgba(88,166,255,0.03); }
 
     .concern-severity {
       flex-shrink: 0;
@@ -280,6 +286,12 @@
 
     .concern-body { flex: 1; min-width: 0; }
 
+    .concern-file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .concern-file {
       font-family: 'SF Mono', 'Fira Code', monospace;
       font-size: 13px;
@@ -287,6 +299,13 @@
       text-decoration: none;
     }
     .concern-file:hover { text-decoration: underline; }
+
+    .concern-toggle {
+      font-size: 10px;
+      color: var(--text-dim);
+      transition: transform 0.15s;
+    }
+    .concern-toggle.open { transform: rotate(90deg); }
 
     .concern-message {
       font-size: 14px;
@@ -300,6 +319,67 @@
       gap: 6px;
       align-items: center;
     }
+
+    /* ── Code snippet ── */
+    .snippet {
+      display: none;
+      margin: 0 24px 12px 44px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      background: #0d1117;
+    }
+    .snippet.open { display: block; }
+
+    .snippet-line {
+      display: flex;
+      padding: 0 12px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .snippet-line.add { background: rgba(63,185,80,0.1); }
+    .snippet-line.del { background: rgba(248,81,73,0.1); }
+    .snippet-line.highlight { background: rgba(88,166,255,0.15); }
+
+    .snippet-num {
+      flex-shrink: 0;
+      width: 48px;
+      text-align: right;
+      padding-right: 12px;
+      color: var(--text-dim);
+      user-select: none;
+      border-right: 1px solid var(--border);
+      margin-right: 12px;
+    }
+
+    .snippet-marker {
+      flex-shrink: 0;
+      width: 12px;
+      color: var(--text-dim);
+      user-select: none;
+    }
+    .snippet-line.add .snippet-marker { color: var(--green); }
+    .snippet-line.del .snippet-marker { color: var(--red); }
+
+    .snippet-text {
+      flex: 1;
+      color: var(--text);
+    }
+    .snippet-line.del .snippet-text { color: var(--red); opacity: 0.7; }
+
+    .snippet-link {
+      display: block;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .snippet-link:hover { text-decoration: underline; }
 
     .btn {
       border: 1px solid var(--border);
@@ -395,6 +475,138 @@
       color: var(--text-dim);
       margin: 0 2px;
     }
+
+    /* ── Review meta bar ── */
+    .review-meta {
+      padding: 8px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: rgba(22,27,34,0.3);
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .meta-label { color: var(--text-dim); }
+    .meta-value { color: var(--text); font-weight: 500; }
+
+    /* ── Jira ticket ── */
+    .jira-bar {
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      background: rgba(22,27,34,0.5);
+    }
+
+    .jira-key {
+      background: #0052CC;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .jira-key:hover { opacity: 0.85; }
+
+    .jira-summary {
+      color: var(--text);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .jira-status {
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 8px;
+      background: var(--border);
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .jira-missing {
+      padding: 8px 24px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--yellow);
+      background: rgba(210,153,34,0.06);
+    }
+
+    .pr-item-jira {
+      font-size: 11px;
+      color: #4C9AFF;
+      margin-top: 2px;
+    }
+
+    /* ── Daemon status footer ── */
+    .daemon-footer {
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--text-dim);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+
+    .daemon-state {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .daemon-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .daemon-dot.idle { background: var(--green); }
+    .daemon-dot.scanning { background: var(--yellow); animation: pulse 1.2s ease-in-out infinite; }
+    .daemon-dot.reviewing { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .daemon-label {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .daemon-progress {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .daemon-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+
+    .daemon-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
   </style>
 </head>
 <body>
@@ -410,6 +622,7 @@
     </div>
     <div class="repo-tabs" id="repo-tabs"></div>
     <div class="pr-list" id="pr-list"></div>
+    <div class="daemon-footer" id="daemon-footer"></div>
   </div>
 
   <!-- Main detail panel -->
@@ -531,6 +744,7 @@
             <div class="pr-item-meta">
               ${activeRepo ? '' : `<span>${esc(pr.repo)}</span>`}
               <span>@${esc(pr.author)}</span>
+              ${review.jiraTicket ? `<span class="pr-item-jira">${esc(review.jiraTicket.key)}</span>` : ''}
             </div>
             <div class="pr-item-stats">
               ${critical ? `<span class="stat-chip critical">${critical} critical</span>` : ''}
@@ -551,6 +765,44 @@
       renderSidebar();
     }
 
+    function renderMeta(review) {
+      const m = review.meta;
+      if (!m) return '';
+
+      const duration = m.durationMs < 60000
+        ? `${(m.durationMs / 1000).toFixed(1)}s`
+        : `${(m.durationMs / 60000).toFixed(1)}m`;
+
+      const tokens = m.inputTokens + m.outputTokens;
+      const tokensStr = tokens > 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens;
+
+      const browsed = m.numTurns > 1;
+
+      return `
+        <div class="review-meta">
+          <div class="meta-item">
+            <span class="meta-label">Duration:</span>
+            <span class="meta-value">${duration}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Turns:</span>
+            <span class="meta-value">${m.numTurns}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Tokens:</span>
+            <span class="meta-value">${tokensStr}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Cost:</span>
+            <span class="meta-value">$${m.costUsd.toFixed(3)}</span>
+          </div>
+          <div class="meta-item">
+            <span class="meta-label">Codebase:</span>
+            <span class="meta-value">${browsed ? 'Yes — browsed files' : 'Diff only'}</span>
+          </div>
+        </div>`;
+    }
+
     function renderDetail(review) {
       const pr = review.prInfo;
       const pending = review.comments.filter(c => c.status === 'pending');
@@ -564,6 +816,20 @@
         bulkActions = `
           <button class="btn btn-approve-all" onclick="approveAll('${review.id}')">Approve</button>
           <button class="btn btn-dismiss-all" onclick="dismissAll('${review.id}')">Dismiss</button>`;
+      }
+
+      let jiraHtml = '';
+      const jt = review.jiraTicket;
+      if (jt) {
+        jiraHtml = `
+          <div class="jira-bar">
+            <a class="jira-key" href="${jt.url}" target="_blank">${esc(jt.key)}</a>
+            <span class="jira-summary">${esc(jt.summary)}</span>
+            <span class="jira-status">${esc(jt.status)}</span>
+            <span style="color:var(--text-dim);font-size:11px">${esc(jt.type)} · ${esc(jt.priority)} · ${esc(jt.assignee)}</span>
+          </div>`;
+      } else {
+        jiraHtml = `<div class="jira-missing">No Jira ticket linked — PR title doesn't contain a recognizable ticket key</div>`;
       }
 
       document.getElementById('main').innerHTML = `
@@ -584,16 +850,69 @@
             ${bulkActions}
           </div>
         </div>
+        ${jiraHtml}
+        ${renderMeta(review)}
         <div class="detail-summary">${esc(review.review.summary)}</div>
         <div class="concern-list">
           ${review.comments.map(c => renderConcern(c, pr)).join('')}
         </div>`;
     }
 
+    // Track which snippets are open
+    const openSnippets = new Set();
+
+    function toggleSnippet(id) {
+      if (openSnippets.has(id)) {
+        openSnippets.delete(id);
+      } else {
+        openSnippets.add(id);
+      }
+      // Re-render just the toggle state
+      const snippet = document.getElementById(`snippet-${id}`);
+      const toggle = document.getElementById(`toggle-${id}`);
+      if (snippet) snippet.classList.toggle('open', openSnippets.has(id));
+      if (toggle) toggle.classList.toggle('open', openSnippets.has(id));
+    }
+
+    function renderSnippet(comment, pr) {
+      const s = comment.snippet;
+      if (!s || !s.lines || s.lines.length === 0) return '';
+
+      const targetLine = comment.concern.line;
+      const fileLink = buildFileLink(pr, comment.concern);
+      const isOpen = openSnippets.has(comment.id);
+
+      const linesHtml = s.lines.map(l => {
+        const isTarget = targetLine && l.num === targetLine;
+        const cls = [
+          'snippet-line',
+          l.type === 'add' ? 'add' : l.type === 'del' ? 'del' : '',
+          isTarget ? 'highlight' : ''
+        ].filter(Boolean).join(' ');
+
+        const marker = l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' ';
+        const num = l.num != null ? l.num : '';
+
+        return `<div class="${cls}"><span class="snippet-num">${num}</span><span class="snippet-marker">${marker}</span><span class="snippet-text">${escCode(l.text)}</span></div>`;
+      }).join('');
+
+      return `
+        <div class="snippet ${isOpen ? 'open' : ''}" id="snippet-${comment.id}">
+          ${linesHtml}
+          <a class="snippet-link" href="${fileLink}" target="_blank">Open in GitHub</a>
+        </div>`;
+    }
+
+    function escCode(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     function renderConcern(comment, pr) {
       const c = comment.concern;
       const fileLink = buildFileLink(pr, c);
       const location = c.line ? `${c.file}:${c.line}` : c.file;
+      const hasSnippet = comment.snippet && comment.snippet.lines && comment.snippet.lines.length > 0;
+      const isOpen = openSnippets.has(comment.id);
 
       let actions = '';
       if (comment.status === 'pending') {
@@ -608,14 +927,20 @@
 
       return `
         <div class="concern">
-          <div class="concern-severity ${c.severity}"></div>
-          <div class="concern-body">
-            <a class="concern-file" href="${fileLink}" target="_blank">${esc(location)}</a>
-            <div class="concern-message">${esc(c.message)}</div>
+          <div class="concern-row" onclick="${hasSnippet ? `toggleSnippet('${comment.id}')` : ''}">
+            <div class="concern-severity ${c.severity}"></div>
+            <div class="concern-body">
+              <div class="concern-file-row">
+                ${hasSnippet ? `<span class="concern-toggle ${isOpen ? 'open' : ''}" id="toggle-${comment.id}">&#9654;</span>` : ''}
+                <a class="concern-file" href="${fileLink}" target="_blank" onclick="event.stopPropagation()">${esc(location)}</a>
+              </div>
+              <div class="concern-message">${esc(c.message)}</div>
+            </div>
+            <div class="concern-actions">
+              ${actions}
+            </div>
           </div>
-          <div class="concern-actions">
-            ${actions}
-          </div>
+          ${renderSnippet(comment, pr)}
         </div>`;
     }
 
@@ -751,9 +1076,80 @@
       }
     });
 
+    // ── Daemon status ──
+    async function loadStatus() {
+      try {
+        const resp = await fetch('/api/status');
+        const s = await resp.json();
+        renderDaemonFooter(s);
+      } catch (e) {}
+    }
+
+    function renderDaemonFooter(s) {
+      const el = document.getElementById('daemon-footer');
+
+      let label = '';
+      let dotClass = s.state;
+
+      if (s.state === 'idle') {
+        if (s.nextPollAt) {
+          const diff = Math.max(0, Math.round((new Date(s.nextPollAt) - Date.now()) / 1000));
+          const min = Math.floor(diff / 60);
+          const sec = diff % 60;
+          label = `Idle — next scan in ${min}:${String(sec).padStart(2, '0')}`;
+        } else {
+          label = 'Idle';
+        }
+      } else if (s.state === 'scanning') {
+        label = 'Scanning for new PRs...';
+      } else if (s.state === 'reviewing' && s.currentPR) {
+        label = `Reviewing #${s.currentPR.number}: ${s.currentPR.title}`;
+      }
+
+      let progressHtml = '';
+      if (s.progress && s.state === 'reviewing') {
+        const pct = Math.round((s.progress.current / s.progress.total) * 100);
+        progressHtml = `
+          <div class="daemon-progress">
+            <div class="daemon-progress-bar" style="width:${pct}%"></div>
+          </div>`;
+      }
+
+      let metaHtml = '';
+      const metaParts = [];
+      if (s.progress && s.state === 'reviewing') {
+        const p = s.progress;
+        let parts = `${p.current}/${p.total}`;
+        if (p.succeeded) parts += ` · ${p.succeeded} done`;
+        if (p.failed) parts += ` · ${p.failed} failed`;
+        metaParts.push(parts);
+      }
+      if (s.retryCount > 0) {
+        metaParts.push(`${s.retryCount} queued for retry`);
+      }
+      if (s.lastScanAt) {
+        const ago = Math.round((Date.now() - new Date(s.lastScanAt)) / 60000);
+        const agoText = ago < 1 ? 'just now' : `${ago}m ago`;
+        metaParts.push(`last scan ${agoText} (${s.lastScanReviewed ?? 0} reviewed)`);
+      }
+      if (metaParts.length) {
+        metaHtml = `<div class="daemon-meta"><span>${metaParts.join(' · ')}</span></div>`;
+      }
+
+      el.innerHTML = `
+        <div class="daemon-state">
+          <span class="daemon-dot ${dotClass}"></span>
+          <span class="daemon-label">${esc(label)}</span>
+        </div>
+        ${progressHtml}
+        ${metaHtml}`;
+    }
+
     // ── Init ──
     loadReviews();
+    loadStatus();
     setInterval(loadReviews, 10_000);
+    setInterval(loadStatus, 2_000);
   </script>
 </body>
 </html>

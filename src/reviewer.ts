@@ -1,15 +1,41 @@
-import { askClaude } from "./claude-delegate.js";
+import { askClaude, type ClaudeResponse } from "./claude-delegate.js";
 import type { ExistingComment } from "./github.js";
+import type { JiraTicket } from "./jira.js";
+import type { ReviewMeta } from "./store.js";
 import type { PRInfo, ReviewResult } from "./types.js";
+
+export interface ReviewOutput {
+  review: ReviewResult;
+  meta?: ReviewMeta;
+}
+
+function extractMeta(response: ClaudeResponse): ReviewMeta {
+  return {
+    durationMs: response.duration_ms,
+    numTurns: response.num_turns,
+    costUsd: response.total_cost_usd,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+  };
+}
 
 const SYSTEM_PROMPT = `You are a thoughtful, senior engineer reviewing a colleague's pull request. Your tone is collaborative — you're helping, not gatekeeping. Write like a real person talking to a teammate.
 
 You will receive:
 1. The PR diff
 2. Existing comments already made on this PR by other reviewers
+3. The linked Jira ticket (if found) — use this to understand the intent and acceptance criteria
+
+You have access to the full codebase via the Read, Glob, and Grep tools. USE THEM when you need to:
+- Understand how a changed function is called elsewhere
+- Check if a pattern used in the diff is consistent with the rest of the codebase
+- Look at related files, types, interfaces, or tests that aren't in the diff
+- Verify imports, dependencies, or configuration
+Don't just review the diff in isolation — look at the surrounding code when it matters.
 
 Your job:
 - Identify real issues: bugs, security problems, logic errors, performance concerns.
+- Use the Jira ticket context to understand WHAT the PR is supposed to do. If the implementation doesn't match the ticket's requirements or acceptance criteria, flag it.
 - DO NOT repeat or rephrase anything that existing comments already cover. If someone already flagged an issue, skip it entirely.
 - If an existing comment partially covers something but misses a nuance, you can add to it — but acknowledge the existing discussion (e.g., "Building on what @reviewer mentioned...").
 
@@ -22,7 +48,7 @@ How to write your comments:
 
 Respond with ONLY a JSON object (no markdown fences):
 {
-  "summary": "2-3 sentence summary of the PR and your take on it. Be direct but friendly.",
+  "summary": "2-3 sentence summary of the PR and your take on it. Reference the Jira ticket context if relevant. Be direct but friendly.",
   "concerns": [
     {
       "file": "path/to/file",
@@ -39,8 +65,10 @@ If the PR looks good and existing comments already cover everything, return an e
 export async function reviewDiff(
   diff: string,
   pr: PRInfo,
-  existingComments: ExistingComment[] = []
-): Promise<ReviewResult> {
+  existingComments: ExistingComment[] = [],
+  jiraTicket?: JiraTicket | null,
+  localRepoPath?: string
+): Promise<ReviewOutput> {
   let commentSection = "";
   if (existingComments.length > 0) {
     const formatted = existingComments
@@ -54,20 +82,43 @@ export async function reviewDiff(
     commentSection = `\n\nExisting comments on this PR (DO NOT duplicate these):\n${formatted}`;
   }
 
+  let jiraSection = "";
+  if (jiraTicket) {
+    jiraSection = `\n\nLinked Jira ticket: ${jiraTicket.key} — ${jiraTicket.summary}
+Type: ${jiraTicket.type} | Status: ${jiraTicket.status} | Priority: ${jiraTicket.priority} | Assignee: ${jiraTicket.assignee}
+Description: ${jiraTicket.description || "(no description)"}
+URL: ${jiraTicket.url}`;
+  } else {
+    jiraSection = `\n\nNo Jira ticket linked to this PR. The PR title does not contain a recognizable ticket key.`;
+  }
+
+  let codebaseNote = "";
+  if (localRepoPath) {
+    codebaseNote = `\n\nThe full codebase is available at ${localRepoPath}. Use Read, Glob, and Grep to look up context when needed — don't guess about how code is used elsewhere.`;
+  }
+
   const prompt = `Review this pull request:
 
 PR #${pr.number}: "${pr.title}" by @${pr.author}
-Repository: ${pr.owner}/${pr.repo}${commentSection}
+Repository: ${pr.owner}/${pr.repo}${jiraSection}${codebaseNote}${commentSection}
 
 Diff:
 ${diff}`;
+
+  // Give Claude read access to the codebase
+  const addDirs: string[] = [];
+  if (localRepoPath) {
+    addDirs.push(localRepoPath);
+  }
 
   try {
     const response = await askClaude({
       prompt,
       model: "sonnet",
       systemPrompt: SYSTEM_PROMPT,
-      timeoutMs: 120_000,
+      timeoutMs: 300_000, // 5 min — codebase browsing takes time
+      addDirs: addDirs.length > 0 ? addDirs : undefined,
+      allowedTools: ["Read", "Glob", "Grep"],
     });
 
     if (response.is_error) {
@@ -79,13 +130,18 @@ ${diff}`;
       .replace(/```\n?/g, "")
       .trim();
 
-    return JSON.parse(clean) as ReviewResult;
+    return {
+      review: JSON.parse(clean) as ReviewResult,
+      meta: extractMeta(response),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return {
-      summary: `Review failed: ${message}`,
-      concerns: [],
-      overallSeverity: "low",
+      review: {
+        summary: `Review failed: ${message}`,
+        concerns: [],
+        overallSeverity: "low",
+      },
     };
   }
 }

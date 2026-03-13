@@ -6,9 +6,18 @@ export interface ClaudeResponse {
   is_error: boolean;
   result: string;
   duration_ms: number;
+  duration_api_ms: number;
+  num_turns: number;
   total_cost_usd: number;
   session_id: string;
   stop_reason: string;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
+  [key: string]: unknown;
 }
 
 export interface DelegateOptions {
@@ -22,6 +31,10 @@ export interface DelegateOptions {
   timeoutMs?: number;
   /** System prompt */
   systemPrompt?: string;
+  /** Additional directories to give Claude access to */
+  addDirs?: string[];
+  /** Allowed tools */
+  allowedTools?: string[];
 }
 
 /**
@@ -35,6 +48,8 @@ export function askClaude(options: DelegateOptions): Promise<ClaudeResponse> {
     maxBudgetUsd,
     timeoutMs = 60_000,
     systemPrompt,
+    addDirs,
+    allowedTools,
   } = options;
 
   const args = ["-p", prompt, "--output-format", "json", "--model", model];
@@ -44,6 +59,14 @@ export function askClaude(options: DelegateOptions): Promise<ClaudeResponse> {
   }
   if (systemPrompt) {
     args.push("--system-prompt", systemPrompt);
+  }
+  if (addDirs) {
+    for (const dir of addDirs) {
+      args.push("--add-dir", dir);
+    }
+  }
+  if (allowedTools) {
+    args.push("--allowedTools", ...allowedTools);
   }
 
   return new Promise((resolve, reject) => {
