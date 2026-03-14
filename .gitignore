@@ -1,5 +1,7 @@
 node_modules/
 dist/
+web/node_modules/
+web/dist/
 review-state.json
 review-store.json
 daemon-status.json

@@ -6,8 +6,10 @@ import {
   updateCommentStatus,
   getComment,
   getPendingCount,
+  addQA,
   type PendingComment,
 } from "./store.js";
+import { askClaude } from "./claude-delegate.js";
 import { postInlineComment } from "./github.js";
 import type { AppConfig } from "./types.js";
 
@@ -110,6 +112,71 @@ export function createServer(config: AppConfig) {
 
     if (errors.length > 0) return c.json({ errors }, 207);
     return c.json({ success: true });
+  });
+
+  // API: ask a follow-up question about a comment
+  app.post("/api/comments/:id/ask", async (c) => {
+    const { id } = c.req.param();
+    const comment = getComment(id);
+    if (!comment) return c.json({ error: "Comment not found" }, 404);
+
+    let question: string;
+    try {
+      const json = await c.req.json();
+      question = json.question;
+      if (!question || typeof question !== "string") {
+        return c.json({ error: "question is required" }, 400);
+      }
+    } catch {
+      return c.json({ error: "Invalid request body" }, 400);
+    }
+
+    const { concern, prInfo } = comment;
+    const snippetText = comment.snippet?.lines
+      ?.map((l) => {
+        const marker = l.type === "add" ? "+" : l.type === "del" ? "-" : " ";
+        const num = l.num != null ? String(l.num).padStart(4) : "    ";
+        return `${num} ${marker} ${l.text}`;
+      })
+      .join("\n") ?? "";
+
+    // Find the local repo path for codebase access
+    const repoConfig = config.repos.find(
+      (r) => r.owner === prInfo.owner && r.repo === prInfo.repo
+    );
+
+    const prompt = `I'm reviewing PR #${prInfo.number}: "${prInfo.title}" in ${prInfo.owner}/${prInfo.repo}.
+
+A reviewer left this comment on ${concern.file}${concern.line ? `:${concern.line}` : ""}:
+
+"${concern.message}"
+
+${snippetText ? `Code context:\n\`\`\`\n${snippetText}\n\`\`\`` : ""}
+
+My follow-up question: ${question}
+
+Answer concisely. If you need to look at the codebase to answer, use the Read/Glob/Grep tools.`;
+
+    try {
+      const response = await askClaude({
+        prompt,
+        model: "sonnet",
+        systemPrompt: "You are a helpful senior engineer answering follow-up questions about a code review comment. Be concise and specific. If the question is about where information came from, explain your reasoning and cite specific files or documentation.",
+        timeoutMs: 120_000,
+        addDirs: repoConfig?.localPath ? [repoConfig.localPath] : undefined,
+        allowedTools: ["Read", "Glob", "Grep"],
+      });
+
+      if (response.is_error) {
+        return c.json({ error: response.result }, 500);
+      }
+
+      addQA(id, question, response.result);
+      return c.json({ answer: response.result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return c.json({ error: msg }, 500);
+    }
   });
 
   // Serve the main HTML page

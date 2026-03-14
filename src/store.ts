@@ -13,6 +13,12 @@ export interface ReviewMeta {
   outputTokens: number;
 }
 
+export interface QAEntry {
+  question: string;
+  answer: string;
+  askedAt: string;
+}
+
 export interface PendingComment {
   id: string;
   prInfo: PRInfo;
@@ -21,6 +27,7 @@ export interface PendingComment {
   status: "pending" | "approved" | "rejected";
   approvedAt?: string;
   rejectedAt?: string;
+  qa?: QAEntry[];
 }
 
 export interface PRReview {
@@ -126,6 +133,23 @@ export function updateCommentStatus(
     }
   }
   return undefined;
+}
+
+export function addQA(
+  commentId: string,
+  question: string,
+  answer: string
+): void {
+  const data = loadStore();
+  for (const review of data.reviews) {
+    const comment = review.comments.find((c) => c.id === commentId);
+    if (comment) {
+      if (!comment.qa) comment.qa = [];
+      comment.qa.push({ question, answer, askedAt: new Date().toISOString() });
+      saveStore(data);
+      return;
+    }
+  }
 }
 
 export function getPendingCount(): number {

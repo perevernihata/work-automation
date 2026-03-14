@@ -411,6 +411,74 @@
       color: #000;
     }
 
+    /* ── Ask follow-up ── */
+    .ask-area {
+      display: none;
+      margin: 0 24px 12px 44px;
+    }
+    .ask-area.open { display: block; }
+
+    .ask-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .ask-input {
+      flex: 1;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+    .ask-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .ask-input::placeholder { color: var(--text-dim); }
+
+    .btn-ask-send {
+      border-color: var(--accent);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .btn-ask-send:hover {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .ask-answer {
+      margin-top: 10px;
+      padding: 12px 14px;
+      background: rgba(88,166,255,0.06);
+      border: 1px solid rgba(88,166,255,0.15);
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .ask-loading {
+      margin-top: 10px;
+      color: var(--text-dim);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-ask {
+      border-color: #8b5cf6;
+      color: #8b5cf6;
+    }
+    .btn-ask:hover {
+      background: #8b5cf6;
+      color: #fff;
+    }
+
     .snippet-link {
       display: block;
       padding: 6px 12px;
@@ -705,8 +773,10 @@
         await precomputeHashes(data.reviews);
         renderTabs();
         renderSidebar();
-        // Don't re-render detail panel if user is editing a comment
-        if (openEditors.size > 0) return;
+        // Don't re-render detail panel if user is editing, asking, or any input is focused
+        if (openEditors.size > 0 || openAsks.size > 0) return;
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
         if (selectedReviewId) {
           const still = data.reviews.find(r => r.id === selectedReviewId);
           if (still) renderDetail(still);
@@ -764,6 +834,22 @@
         list.innerHTML = '<div style="padding:40px 20px;text-align:center;color:var(--text-dim);font-size:13px">No reviews yet. Click Scan or wait for the poller.</div>';
         return;
       }
+
+      // Sort: pending criticals first, then pending warnings, then pending info, all-resolved last
+      const severityWeight = { high: 3, medium: 2, low: 1 };
+      reviews.sort((a, b) => {
+        const aPending = a.comments.filter(c => c.status === 'pending').length;
+        const bPending = b.comments.filter(c => c.status === 'pending').length;
+        // All resolved goes to bottom
+        if (aPending === 0 && bPending > 0) return 1;
+        if (bPending === 0 && aPending > 0) return -1;
+        // Both have pending — sort by severity then by critical count
+        const aSev = severityWeight[a.review.overallSeverity] || 0;
+        const bSev = severityWeight[b.review.overallSeverity] || 0;
+        if (aSev !== bSev) return bSev - aSev;
+        // Same severity — more pending comments first
+        return bPending - aPending;
+      });
 
       list.innerHTML = reviews.map((review, i) => {
         const pr = review.prInfo;
@@ -960,16 +1046,21 @@
       let actions = '';
       if (comment.status === 'pending') {
         actions = `
+          <button class="btn btn-ask" onclick="event.stopPropagation();toggleAsk('${comment.id}')">Ask</button>
           <button class="btn btn-edit" onclick="event.stopPropagation();toggleEdit('${comment.id}')">Edit</button>
           <button class="btn btn-approve" onclick="event.stopPropagation();approve('${comment.id}', this)">Approve</button>
           <button class="btn btn-reject" onclick="event.stopPropagation();reject('${comment.id}', this)">Reject</button>`;
       } else if (comment.status === 'approved') {
-        actions = '<span class="status-approved">Posted</span>';
+        actions = `<button class="btn btn-ask" onclick="event.stopPropagation();toggleAsk('${comment.id}')">Ask</button>
+          <span class="status-approved">Posted</span>`;
       } else {
-        actions = '<span class="status-rejected">Dismissed</span>';
+        actions = `<button class="btn btn-ask" onclick="event.stopPropagation();toggleAsk('${comment.id}')">Ask</button>
+          <span class="status-rejected">Dismissed</span>`;
       }
 
       const editorOpen = openEditors.has(comment.id);
+      const hasQA = comment.qa && comment.qa.length > 0;
+      const askOpen = openAsks.has(comment.id) || hasQA;
 
       return `
         <div class="concern">
@@ -992,6 +1083,14 @@
               <button class="btn" onclick="cancelEdit('${comment.id}')">Cancel</button>
               <button class="btn btn-approve" onclick="approveEdited('${comment.id}')">Post edited</button>
             </div>
+          </div>
+          <div class="ask-area ${askOpen ? 'open' : ''}" id="ask-${comment.id}">
+            ${renderQAHistory(comment)}
+            <div class="ask-input-row">
+              <input class="ask-input" id="askq-${comment.id}" placeholder="Ask a follow-up question about this comment..." onkeydown="if(event.key==='Enter'){event.preventDefault();sendAsk('${comment.id}')}" />
+              <button class="btn btn-ask-send" onclick="sendAsk('${comment.id}')">Send</button>
+            </div>
+            <div id="ask-result-${comment.id}"></div>
           </div>
           ${renderSnippet(comment, pr)}
         </div>`;
@@ -1072,6 +1171,70 @@
         await loadReviews();
       } catch (e) {
         alert('Failed: ' + e.message);
+      }
+    }
+
+    // ── Ask follow-up ──
+    const openAsks = new Set();
+
+    function renderQAHistory(comment) {
+      const qa = comment.qa;
+      if (!qa || qa.length === 0) return '';
+      return qa.map(entry => `
+        <div style="margin-bottom:10px">
+          <div style="font-size:12px;color:var(--accent);font-weight:500;margin-bottom:4px">Q: ${esc(entry.question)}</div>
+          <div class="ask-answer">${esc(entry.answer)}</div>
+        </div>
+      `).join('');
+    }
+
+    function toggleAsk(id) {
+      const el = document.getElementById(`ask-${id}`);
+      if (!el) return;
+      if (openAsks.has(id)) {
+        openAsks.delete(id);
+        el.classList.remove('open');
+      } else {
+        openAsks.add(id);
+        el.classList.add('open');
+        const input = document.getElementById(`askq-${id}`);
+        if (input) input.focus();
+      }
+    }
+
+    async function sendAsk(id) {
+      const input = document.getElementById(`askq-${id}`);
+      const resultEl = document.getElementById(`ask-result-${id}`);
+      if (!input || !resultEl) return;
+      const question = input.value.trim();
+      if (!question) return;
+
+      resultEl.innerHTML = '<div class="ask-loading"><span class="spinner"></span> Thinking...</div>';
+      input.value = '';
+
+      try {
+        const resp = await fetch(`/api/comments/${id}/ask`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question }),
+        });
+        const result = await resp.json();
+        if (result.error) {
+          resultEl.innerHTML = `<div class="ask-answer" style="border-color:var(--red);background:rgba(248,81,73,0.06)">Error: ${esc(result.error)}</div>`;
+        } else {
+          // Reload to show the persisted Q&A
+          await loadReviews();
+          // Re-open the ask area and re-select
+          if (selectedReviewId) {
+            const review = data.reviews.find(r => r.id === selectedReviewId);
+            if (review) {
+              openAsks.add(id);
+              renderDetail(review);
+            }
+          }
+        }
+      } catch (e) {
+        resultEl.innerHTML = `<div class="ask-answer" style="border-color:var(--red)">Failed: ${esc(e.message)}</div>`;
       }
     }
 
@@ -1242,7 +1405,32 @@
         ${metaHtml}`;
     }
 
+    // ── URL state ──
+    function saveUrlState() {
+      const parts = [];
+      if (activeRepo) parts.push(`repo=${encodeURIComponent(activeRepo)}`);
+      if (selectedReviewId) parts.push(`pr=${selectedReviewId}`);
+      history.replaceState(null, '', parts.length ? `#${parts.join('&')}` : location.pathname);
+    }
+
+    function restoreUrlState() {
+      const hash = location.hash.slice(1);
+      if (!hash) return;
+      const params = new URLSearchParams(hash);
+      const repo = params.get('repo');
+      const pr = params.get('pr');
+      if (repo) activeRepo = repo;
+      if (pr) selectedReviewId = pr;
+    }
+
+    // Patch selectReview and setRepo to save URL state
+    const _origSelectReview = selectReview;
+    selectReview = function(id) { _origSelectReview(id); saveUrlState(); };
+    const _origSetRepo = setRepo;
+    setRepo = function(repo) { _origSetRepo(repo); saveUrlState(); };
+
     // ── Init ──
+    restoreUrlState();
     loadReviews();
     loadStatus();
     setInterval(loadReviews, 10_000);
