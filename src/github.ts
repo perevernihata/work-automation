@@ -143,38 +143,56 @@ export async function postInlineComment(
 ): Promise<void> {
   const client = getClient(config);
 
+  // Try inline comment, fall back to PR-level if the line isn't in the diff
   if (file && line) {
-    // Post as an inline review comment on the specific file and line
-    await client.rest.pulls.createReviewComment({
-      owner: pr.owner,
-      repo: pr.repo,
-      pull_number: pr.number,
-      body,
-      commit_id: pr.headSha,
-      path: file,
-      line,
-      side: "RIGHT",
-    });
-  } else if (file) {
-    // File known but no line — comment on line 1 of the file
-    await client.rest.pulls.createReviewComment({
-      owner: pr.owner,
-      repo: pr.repo,
-      pull_number: pr.number,
-      body,
-      commit_id: pr.headSha,
-      path: file,
-      line: 1,
-      side: "RIGHT",
-    });
-  } else {
-    // No file context — fall back to a PR-level review comment
-    await client.rest.pulls.createReview({
-      owner: pr.owner,
-      repo: pr.repo,
-      pull_number: pr.number,
-      body,
-      event: "COMMENT",
-    });
+    try {
+      await client.rest.pulls.createReviewComment({
+        owner: pr.owner,
+        repo: pr.repo,
+        pull_number: pr.number,
+        body,
+        commit_id: pr.headSha,
+        path: file,
+        line,
+        side: "RIGHT",
+      });
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("pull_request_review_thread.line") || msg.includes("could not be resolved")) {
+        console.warn(`  Line ${line} not in diff for ${file}, falling back to PR comment`);
+      } else {
+        throw err;
+      }
+    }
   }
+
+  if (file) {
+    try {
+      await client.rest.pulls.createReviewComment({
+        owner: pr.owner,
+        repo: pr.repo,
+        pull_number: pr.number,
+        body: `**${file}${line ? `:${line}` : ""}**\n\n${body}`,
+        commit_id: pr.headSha,
+        path: file,
+        line: 1,
+        side: "RIGHT",
+      });
+      return;
+    } catch {
+      // Line 1 also not in diff — fall through to PR-level comment
+      console.warn(`  File ${file} not in diff, falling back to PR comment`);
+    }
+  }
+
+  // PR-level comment as last resort — include file reference in body
+  const prefix = file ? `**${file}${line ? `:${line}` : ""}**\n\n` : "";
+  await client.rest.pulls.createReview({
+    owner: pr.owner,
+    repo: pr.repo,
+    pull_number: pr.number,
+    body: `${prefix}${body}`,
+    event: "COMMENT",
+  });
 }

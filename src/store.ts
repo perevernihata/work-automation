@@ -134,3 +134,21 @@ export function getPendingCount(): number {
     0
   );
 }
+
+/**
+ * Remove reviews for PRs that are no longer open.
+ * Pass the set of currently open PR keys ("owner/repo#number").
+ */
+export function pruneClosedPRs(openPRKeys: Set<string>): number {
+  const data = loadStore();
+  const before = data.reviews.length;
+  data.reviews = data.reviews.filter((r) => {
+    const key = `${r.prInfo.owner}/${r.prInfo.repo}#${r.prInfo.number}`;
+    return openPRKeys.has(key);
+  });
+  const removed = before - data.reviews.length;
+  if (removed > 0) {
+    saveStore(data);
+  }
+  return removed;
+}

@@ -730,17 +730,16 @@
       );
 
       let html = `<button class="repo-tab ${activeRepo === null ? 'active' : ''}" onclick="setRepo(null)">
-        All<span class="tab-count">${data.reviews.length}</span>
+        All<span class="tab-count">${data.reviews.length} PRs · ${data.pendingCount} pending</span>
       </button>`;
 
       for (const [repo, count] of repos) {
-        const pending = data.reviews
-          .filter(r => `${r.prInfo.owner}/${r.prInfo.repo}` === repo)
-          .reduce((s, r) => s + r.comments.filter(c => c.status === 'pending').length, 0);
+        const repoReviews = data.reviews.filter(r => `${r.prInfo.owner}/${r.prInfo.repo}` === repo);
+        const pending = repoReviews.reduce((s, r) => s + r.comments.filter(c => c.status === 'pending').length, 0);
         const short = repo.split('/')[1] || repo;
         const isActive = activeRepo === repo;
         html += `<button class="repo-tab ${isActive ? 'active' : ''}" onclick="setRepo('${repo}')">
-          ${esc(short)}${pending ? `<span class="tab-count">${pending}</span>` : ''}
+          ${esc(short)}<span class="tab-count">${repoReviews.length} PRs${pending ? ` · ${pending} pending` : ''}</span>
         </button>`;
       }
 

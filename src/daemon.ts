@@ -11,7 +11,7 @@ import { listOpenPRs, getPRDiff, getPRComments } from "./github.js";
 import { extractTicketKey, fetchJiraTicket } from "./jira.js";
 import { reviewDiff } from "./reviewer.js";
 import { loadState, saveState, needsReview, markReviewed } from "./state.js";
-import { addReview } from "./store.js";
+import { addReview, pruneClosedPRs } from "./store.js";
 import type { AppConfig, PRInfo, ReviewState } from "./types.js";
 
 const DELAY_BETWEEN_REVIEWS_MS = 5_000;
@@ -33,6 +33,7 @@ async function scanOnce(config: AppConfig, state: ReviewState): Promise<number> 
   saveDaemonStatus();
 
   const toReview: PRInfo[] = [];
+  const allOpenKeys = new Set<string>();
 
   for (const repo of config.repos) {
     console.log(`  Checking ${repo.owner}/${repo.repo}...`);
@@ -46,10 +47,17 @@ async function scanOnce(config: AppConfig, state: ReviewState): Promise<number> 
     }
 
     for (const pr of prs) {
+      allOpenKeys.add(prKey(pr));
       if (needsReview(state, pr) || retryQueue.has(prKey(pr))) {
         toReview.push(pr);
       }
     }
+  }
+
+  // Prune reviews for PRs that are no longer open (merged/closed)
+  const pruned = pruneClosedPRs(allOpenKeys);
+  if (pruned > 0) {
+    console.log(`  Pruned ${pruned} review(s) for merged/closed PRs.`);
   }
 
   if (toReview.length === 0) {
