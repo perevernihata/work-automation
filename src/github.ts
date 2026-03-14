@@ -33,6 +33,7 @@ export async function listOpenPRs(
     headSha: pr.head.sha,
     updatedAt: pr.updated_at,
     url: pr.html_url,
+    changedLines: ((pr as Record<string, unknown>).additions as number ?? 0) + ((pr as Record<string, unknown>).deletions as number ?? 0),
   }));
 }
 

@@ -370,6 +370,47 @@
     }
     .snippet-line.del .snippet-text { color: var(--red); opacity: 0.7; }
 
+    /* ── Edit textarea ── */
+    .edit-area {
+      display: none;
+      margin: 0 24px 12px 44px;
+    }
+    .edit-area.open { display: block; }
+
+    .edit-textarea {
+      width: 100%;
+      min-height: 80px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .edit-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      justify-content: flex-end;
+    }
+
+    .btn-edit {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-edit:hover {
+      background: var(--accent);
+      color: #000;
+    }
+
     .snippet-link {
       display: block;
       padding: 6px 12px;
@@ -664,6 +705,8 @@
         await precomputeHashes(data.reviews);
         renderTabs();
         renderSidebar();
+        // Don't re-render detail panel if user is editing a comment
+        if (openEditors.size > 0) return;
         if (selectedReviewId) {
           const still = data.reviews.find(r => r.id === selectedReviewId);
           if (still) renderDetail(still);
@@ -858,8 +901,9 @@
         </div>`;
     }
 
-    // Track which snippets are open
+    // Track which snippets/editors are open
     const openSnippets = new Set();
+    const openEditors = new Set();
 
     function toggleSnippet(id) {
       if (openSnippets.has(id)) {
@@ -917,6 +961,7 @@
       let actions = '';
       if (comment.status === 'pending') {
         actions = `
+          <button class="btn btn-edit" onclick="event.stopPropagation();toggleEdit('${comment.id}')">Edit</button>
           <button class="btn btn-approve" onclick="event.stopPropagation();approve('${comment.id}', this)">Approve</button>
           <button class="btn btn-reject" onclick="event.stopPropagation();reject('${comment.id}', this)">Reject</button>`;
       } else if (comment.status === 'approved') {
@@ -924,6 +969,8 @@
       } else {
         actions = '<span class="status-rejected">Dismissed</span>';
       }
+
+      const editorOpen = openEditors.has(comment.id);
 
       return `
         <div class="concern">
@@ -934,10 +981,17 @@
                 ${hasSnippet ? `<span class="concern-toggle ${isOpen ? 'open' : ''}" id="toggle-${comment.id}">&#9654;</span>` : ''}
                 <a class="concern-file" href="${fileLink}" target="_blank" onclick="event.stopPropagation()">${esc(location)}</a>
               </div>
-              <div class="concern-message">${esc(c.message)}</div>
+              <div class="concern-message" id="msg-${comment.id}">${esc(c.message)}</div>
             </div>
             <div class="concern-actions">
               ${actions}
+            </div>
+          </div>
+          <div class="edit-area ${editorOpen ? 'open' : ''}" id="editor-${comment.id}">
+            <textarea class="edit-textarea" id="edittext-${comment.id}">${esc(c.message)}</textarea>
+            <div class="edit-actions">
+              <button class="btn" onclick="cancelEdit('${comment.id}')">Cancel</button>
+              <button class="btn btn-approve" onclick="approveEdited('${comment.id}')">Post edited</button>
             </div>
           </div>
           ${renderSnippet(comment, pr)}
@@ -976,6 +1030,50 @@
       const d = document.createElement('div');
       d.textContent = str;
       return d.innerHTML;
+    }
+
+    // ── Edit ──
+    function toggleEdit(id) {
+      const el = document.getElementById(`editor-${id}`);
+      if (!el) return;
+      if (openEditors.has(id)) {
+        openEditors.delete(id);
+        el.classList.remove('open');
+      } else {
+        openEditors.add(id);
+        el.classList.add('open');
+        const ta = document.getElementById(`edittext-${id}`);
+        if (ta) ta.focus();
+      }
+    }
+
+    function cancelEdit(id) {
+      openEditors.delete(id);
+      const el = document.getElementById(`editor-${id}`);
+      if (el) el.classList.remove('open');
+    }
+
+    async function approveEdited(id) {
+      const ta = document.getElementById(`edittext-${id}`);
+      if (!ta) return;
+      const body = ta.value.trim();
+      if (!body) { alert('Comment is empty'); return; }
+      try {
+        const resp = await fetch(`/api/comments/${id}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json();
+          alert('Error: ' + (err.error || 'Unknown'));
+          return;
+        }
+        openEditors.delete(id);
+        await loadReviews();
+      } catch (e) {
+        alert('Failed: ' + e.message);
+      }
     }
 
     // ── Actions ──

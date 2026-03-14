@@ -116,7 +116,7 @@ ${diff}`;
       prompt,
       model: "sonnet",
       systemPrompt: SYSTEM_PROMPT,
-      timeoutMs: 300_000, // 5 min — codebase browsing takes time
+      timeoutMs: 600_000, // 10 min — large diffs with codebase browsing take time
       addDirs: addDirs.length > 0 ? addDirs : undefined,
       allowedTools: ["Read", "Glob", "Grep"],
     });
@@ -125,13 +125,19 @@ ${diff}`;
       throw new Error(response.result);
     }
 
-    const clean = response.result
+    const raw = response.result
       .replace(/```json?\n?/g, "")
       .replace(/```\n?/g, "")
       .trim();
 
+    // Claude may narrate before/after the JSON — extract the JSON object
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error(`No JSON found in response: ${raw.slice(0, 200)}`);
+    }
+
     return {
-      review: JSON.parse(clean) as ReviewResult,
+      review: JSON.parse(jsonMatch[0]) as ReviewResult,
       meta: extractMeta(response),
     };
   } catch (err) {

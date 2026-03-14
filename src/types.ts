@@ -21,6 +21,8 @@ export interface PRInfo {
   headSha: string;
   updatedAt: string;
   url: string;
+  /** additions + deletions — used to prioritise small PRs */
+  changedLines: number;
 }
 
 export interface Concern {

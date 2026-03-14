@@ -41,7 +41,7 @@ export function createServer(config: AppConfig) {
     });
   });
 
-  // API: approve a comment — posts it to GitHub
+  // API: approve a comment — posts it to GitHub (optionally with edited body)
   app.post("/api/comments/:id/approve", async (c) => {
     const { id } = c.req.param();
     const comment = getComment(id);
@@ -49,8 +49,26 @@ export function createServer(config: AppConfig) {
     if (comment.status !== "pending")
       return c.json({ error: `Already ${comment.status}` }, 400);
 
+    // Allow overriding the comment body
+    let bodyOverride: string | undefined;
     try {
-      await postComment(config, comment);
+      const json = await c.req.json();
+      if (json.body && typeof json.body === "string") {
+        bodyOverride = json.body;
+      }
+    } catch {
+      // No body sent — use default
+    }
+
+    try {
+      if (bodyOverride) {
+        // Post with edited text
+        const { concern, prInfo } = comment;
+        await postInlineComment(config, prInfo, bodyOverride, concern.file, concern.line);
+        updateCommentStatus(id, "approved", bodyOverride);
+      } else {
+        await postComment(config, comment);
+      }
       return c.json({ success: true });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -1,14 +1,13 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const STATUS_PATH = "./daemon-status.json";
+
 export interface DaemonStatus {
   state: "idle" | "scanning" | "reviewing";
-  /** Currently reviewing this PR, if any */
   currentPR?: { number: number; title: string; repo: string };
-  /** Progress in current scan cycle */
   progress?: { current: number; total: number; succeeded: number; failed: number };
-  /** Number of PRs that will be retried */
   retryCount: number;
-  /** When the next poll will happen */
   nextPollAt?: string;
-  /** Last completed scan */
   lastScanAt?: string;
   lastScanReviewed?: number;
 }
@@ -20,6 +19,19 @@ const status: DaemonStatus = {
 
 export function getStatus(): DaemonStatus {
   return { ...status };
+}
+
+export function loadDaemonStatus(): DaemonStatus {
+  try {
+    const raw = readFileSync(STATUS_PATH, "utf-8");
+    return JSON.parse(raw) as DaemonStatus;
+  } catch {
+    return { state: "idle", retryCount: 0 };
+  }
+}
+
+export function saveDaemonStatus(): void {
+  writeFileSync(STATUS_PATH, JSON.stringify(status, null, 2) + "\n");
 }
 
 export function setIdle(retryCount: number, nextPollAt?: Date) {
