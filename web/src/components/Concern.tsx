@@ -138,7 +138,9 @@ export function Concern({
       if (result.error) {
         setAskResult({ error: result.error });
       } else {
-        setAskResult(null);
+        setAskResult({ answer: result.answer });
+        // Blur the input so poll protection doesn't block re-render
+        askInputRef.current?.blur();
         // Ensure ask stays open, reload data
         if (!openAsks.has(comment.id)) {
           onToggleAsk(comment.id);

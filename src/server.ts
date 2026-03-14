@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
 import {
   getReviews,
   updateCommentStatus,
@@ -31,9 +30,6 @@ async function postComment(
 
 export function createServer(config: AppConfig) {
   const app = new Hono();
-
-  // Serve static frontend
-  app.use("/static/*", serveStatic({ root: "./" }));
 
   // API: list all reviews
   app.get("/api/reviews", (c) => {
@@ -177,13 +173,6 @@ Answer concisely. If you need to look at the codebase to answer, use the Read/Gl
       const msg = err instanceof Error ? err.message : String(err);
       return c.json({ error: msg }, 500);
     }
-  });
-
-  // Serve the main HTML page
-  app.get("/", async (c) => {
-    const fs = await import("node:fs/promises");
-    const html = await fs.readFile("static/index.html", "utf-8");
-    return c.html(html);
   });
 
   return app;

@@ -4,12 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
     "daemon": "tsx src/daemon.ts",
     "api": "tsx --watch src/web.ts",
-    "ui": "cd web && npx vite --port 5173",
-    "web": "tsx --watch src/web.ts"
+    "ui": "cd web && npx vite --port 5173"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
